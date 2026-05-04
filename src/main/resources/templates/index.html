@@ -1,17 +1,86 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <title>AI 메일 어시스턴트</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; padding: 50px; text-align: center; }
-        .box { border: 1px solid #ccc; padding: 20px; border-radius: 10px; display: inline-block; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .chat-container { width: 100%; max-width: 600px; background: white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 20px; }
+        .chat-box { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background: #fafafa; }
+        .message { margin-bottom: 15px; line-height: 1.5; }
+        .user-msg { color: #0056b3; font-weight: bold; }
+        .ai-msg { color: #333; }
+        .input-area { display: flex; gap: 10px; }
+        textarea { flex: 1; height: 60px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; resize: none; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
-<div class="box">
-    <h1 th:text="${message}">서버 연결 중...</h1>
-    <p>Phase 1: 챗봇 방식 교정 기능 준비 화면입니다.</p>
+<div class="chat-container">
+    <h2>🤖 AI 메일 교정기 (Phase 1)</h2>
+    <div class="chat-box" id="chatBox">
+        <div class="message ai-msg">안녕하세요! 교정이 필요한 메일 정보를 입력해 주세요.</div>
+    </div>
+
+    <!-- 입력 폼 영역 시작 -->
+    <div class="form-area" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+        <input type="text" id="inputTo" placeholder="받는사람 (예: aa@naver.com)" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <input type="text" id="inputCc" placeholder="참조 (예: cc@company.com)" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <textarea id="inputBody" placeholder="메일 본문을 입력하세요..." style="height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; resize: none;"></textarea>
+        <button onclick="sendMessage()" style="padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">AI 교정 및 미리보기</button>
+    </div>
 </div>
+
+<script>
+    async function sendMessage() {
+        const inputTo = document.getElementById('inputTo').value;
+        const inputCc = document.getElementById('inputCc').value;
+        const inputBody = document.getElementById('inputBody').value.trim();
+        const chatBox = document.getElementById('chatBox');
+
+        if (!inputBody) {
+            alert("메일 본문을 입력해 주세요!");
+            return;
+        }
+
+        // 1. 사용자 입력 화면에 표시 (To, CC 포함)
+        chatBox.innerHTML += `<div class="message user-msg">
+            [보내는 내용]<br>
+            To: ${inputTo}<br>
+            CC: ${inputCc}<br>
+            본문: ${inputBody}
+        </div>`;
+
+        // 2. 대기 메시지 표시
+        const loadingId = "loading-" + Date.now();
+        chatBox.innerHTML += `<div id="${loadingId}" class="message ai-msg">AI: 교정 중입니다... ⏳</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            // 3. 스프링 부트 서버로 분리된 데이터 전송 (DTO 규격에 맞춤)
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: inputTo,
+                    cc: inputCc,
+                    body: inputBody
+                })
+            });
+
+            const aiText = await response.text();
+
+            // 4. 대기 메시지 지우고 실제 답변 표시
+            document.getElementById(loadingId).remove();
+            chatBox.innerHTML += `<div class="message ai-msg">AI: <br>${aiText.replace(/\n/g, '<br>')}</div>`;
+
+        } catch (error) {
+            document.getElementById(loadingId).remove();
+            chatBox.innerHTML += `<div class="message ai-msg" style="color:red;">AI: 서버와 연결할 수 없습니다.</div>`;
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
 </body>
 </html>
