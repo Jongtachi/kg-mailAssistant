@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "AI 메일 어시스턴트 (KG ICT)",
+  "version": "1.0",
+  "description": "사내 웹 메일 팝업에서 AI 교정 기능을 제공합니다.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gw.kggroup.co.kr/mail/userMail/goMailWindowWritePopup.do*"
+      ],
+      "js": ["content.js"],
+      "world": "MAIN"
+    }
+  ]
+}
