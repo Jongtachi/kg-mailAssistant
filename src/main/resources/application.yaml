@@ -1,0 +1,10 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mailassistant
+  thymeleaf:
+    cache: false # 개발 중에는 false로 해야 HTML 수정 시 서버 재시작 없이 바로 반영됩니다.
+    prefix: classpath:/templates/
+    suffix: .html
