@@ -25,27 +25,53 @@ public class MailApiController {
 
     @PostMapping("/correct")
     public ResponseEntity<String> correctMail(@RequestBody MailRequest request) {
-        System.out.println("📬 [AI 서버] 익스텐션 본문 도착! Ollama로 교정 요청을 보냅니다...");
+        // 프론트에서 모드 값을 안 보냈다면 기본값은 'formal(정중하게)'로 세팅
+        String mode = request.mode() != null ? request.mode() : "formal";
+        System.out.println("📬 [AI 서버] 모드 [" + mode + "] 로 교정 요청 도착!");
 
-        // 1. 시스템 프롬프트: AI의 자아를 없애고 엄격한 규칙을 부여합니다.
-        String systemPrompt = "당신은 한국어 비즈니스 이메일 교정 전문가입니다.\n"
-                + "사용자의 메일 초안을 회사에서 쓰는 정중하고 격식 있는 존댓말(비즈니스 어조)로 수정하세요.\n"
-                + "[절대 지켜야 할 규칙]\n"
-                + "1. '안녕하시구려', '자네' 등의 비격식체나 반말은 '안녕하십니까', '요청하신' 등으로 완벽하게 수정할 것.\n"
-                + "2. '네, 알겠습니다.', '여기 교정본입니다.', '죄송합니다.' 같은 너의 대답이나 인사말은 절대(Never) 출력하지 말 것.\n"
-                + "3. 오직 교정이 완료된 메일 본문만 텍스트로 출력할 것.";
+        String systemPrompt = "";
 
-        // 2. 실제 데이터 (사용자 입력)
+        // 💡 선택된 모드에 따라 AI의 '자아(프롬프트)'를 바꿉니다!
+        if ("concise".equals(mode)) {
+            systemPrompt = "당신은 한국 대기업의 비즈니스 텍스트 요약 전문가입니다.\n"
+                    + "입력된 HTML 문서의 태그 구조를 유지한 채, 텍스트 내용을 핵심만 남기고 아주 간결하게 줄이세요.\n"
+                    + "[필수 지침]\n"
+                    + "1. 불필요한 수식어나 긴 인사말은 과감히 삭제하고 요점만 '하십시오체'로 전달할 것.\n"
+                    + "2. 항목이 많을 경우 1. 2. 3. 같은 개조식(Bullet point)으로 정리해도 좋음.\n"
+                    + "3. 🚨절대 금지🚨: '요약 내용:', '수정 사항:' 등 AI가 자의적으로 작성하는 요약, 보고, 부연 설명은 절대 금지합니다.\n"
+                    + "4. 오직(ONLY) 교정된 HTML 텍스트 결과물 하나만 출력하세요.";
+        }
+        else if ("english".equals(mode)) {
+            systemPrompt = "당신은 실리콘밸리 IT 기업의 비즈니스 영문 번역가입니다.\n"
+                    + "입력된 HTML 문서의 태그 구조를 100% 유지한 채, 텍스트 내용을 세련되고 프로페셔널한 비즈니스 영어로 번역하세요.\n"
+                    + "[필수 지침]\n"
+                    + "1. 단순 직역이 아닌, 네이티브가 자주 쓰는 정중한 비즈니스 이메일 표현을 사용할 것.\n"
+                    + "2. 🚨절대 금지🚨: 'Here is the translation:', 'Note:', '번역 내용:' 등 번역 전/후의 AI 인사말이나 부연 설명은 절대 금지합니다.\n"
+                    + "3. 오직(ONLY) 번역된 HTML 텍스트 결과물 하나만 출력하세요.";
+        }
+        else {
+            // 기본 모드 (formal)
+            systemPrompt = "당신은 한국 대기업의 비즈니스 텍스트 교정 전문가입니다.\n"
+                    + "입력된 HTML 문서의 태그 구조를 100% 유지한 채, 텍스트 내용만 격식 있는 '비즈니스 하십시오체(다나까체)'로 교정하세요.\n\n"
+                    + "[필수 지침]\n"
+                    + "1. 어조 및 인사말: '~요', '~구려' 등 구어체/비격식체는 절대 금지. 인사말은 삭제하지 말고 반드시 '안녕하십니까' 등의 정중한 표현으로 '수정'하여 유지할 것.\n"
+                    + "2. 비속어/은어 순화: '존나게' 등 업무에 부적절한 단어는 '언제든지', '편하게', '대단히' 등으로 완벽하게 순화하거나 삭제할 것.\n"
+                    + "3. 용어: 오늘->금일, 내일->명일, 어제->작일, 보내다->송부하다/전달하다.\n"
+                    + "4. 🚨절대 금지🚨: '교정 내용:', '수정 사항:', '참고:' 등 AI가 자의적으로 작성하는 요약, 보고, 부연 설명은 절대 금지합니다.\n"
+                    + "5. 오직(ONLY) 교정된 HTML 텍스트 결과물 하나만 출력하세요.\n\n"
+                    + "[교정 예시]\n"
+                    + "입력: <p>안녕하시구료, 존나게 고생 많으십니다. <b>오늘</b> 무슨 날인지 알려줄수 있습니까?</p>\n"
+                    + "출력: <p>안녕하세요, 노고가 많으십니다. <b>금일</b> 무슨 날인지 공유 부탁드립니다.</p>";
+        }
+
         String prompt = request.text();
 
-        // 3. Ollama 상세 설정
         Map<String, Object> ollamaRequest = new HashMap<>();
-        ollamaRequest.put("model", OLLAMA_MODEL);
-        ollamaRequest.put("system", systemPrompt); // 시스템 역할 부여
-        ollamaRequest.put("prompt", prompt);       // 순수 데이터만 전달
+        ollamaRequest.put("model", OLLAMA_MODEL); // "llama3.1"
+        ollamaRequest.put("system", systemPrompt);
+        ollamaRequest.put("prompt", prompt);
         ollamaRequest.put("stream", false);
 
-        // ✨ 핵심: 창의성(temperature)을 0.1로 낮춰서 소설 쓰는 것을 원천 차단! (기본값은 0.8)
         Map<String, Object> options = new HashMap<>();
         options.put("temperature", 0.1);
         ollamaRequest.put("options", options);
